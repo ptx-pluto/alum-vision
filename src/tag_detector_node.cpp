@@ -34,6 +34,85 @@ tf::Quaternion rvec2tf( cv::Vec3d const & rvec ){
 
 }
 
+struct hole_marker_t {
+
+    hole_marker_t(){
+        set_dict(cv::aruco::DICT_4X4_50);
+    }
+
+    cv::Ptr<cv::aruco::Dictionary> dictionary;
+
+    std::vector<cv::Point2f> pts;
+
+    std::vector<int> ids;
+
+    cv::Point2f hole_pt;
+
+    float hole_size = 18.2;
+
+    float tag_size = 10;
+
+    void add_tag( cv::Point2f const & pt, int tag_id ){
+        pts.push_back(pt);
+        ids.push_back(tag_id);
+    }
+
+    void set_hole( cv::Point2f const & pt, float size ){
+        hole_pt = pt;
+        hole_size = size;
+    }
+
+    void set_dict( cv::aruco::PREDEFINED_DICTIONARY_NAME name = cv::aruco::DICT_4X4_50 ){
+        dictionary = cv::aruco::getPredefinedDictionary(name);
+    }
+
+    cv::Ptr<cv::aruco::Board> make_board(){
+
+        std::vector<std::vector<cv::Point3f> > objPoints;
+
+        float center_x = hole_pt.x + hole_size/2;
+        float center_y = hole_pt.y + hole_size/2;
+
+        for ( size_t i=0; i<ids.size(); i++ ) {
+
+            float x = pts.at(i).x - center_x;
+            float y = pts.at(i).y - center_y;
+
+            y = -y;
+
+            objPoints.emplace_back();
+            objPoints.back().emplace_back(x,y,0);
+            objPoints.back().emplace_back(x+tag_size,y,0);
+            objPoints.back().emplace_back(x+tag_size,y-tag_size,0);
+            objPoints.back().emplace_back(x,y-tag_size,0);
+
+        }
+
+        return cv::aruco::Board::create(objPoints,dictionary,ids);
+
+    }
+
+    static hole_marker_t create_marker_1(){
+
+        hole_marker_t marker;
+
+        marker.set_hole({47.6,104.2},18.2);
+
+        marker.add_tag({51.7,91.3},0);
+        marker.add_tag({67.8,91.5},1);
+        marker.add_tag({34,91.5},2);
+        marker.add_tag({68.6,108.3},3);
+        marker.add_tag({33.8,108.3},4);
+
+        return marker;
+
+    }
+
+
+};
+
+
+
 
 struct marker_detector_t {
 
@@ -153,6 +232,16 @@ int main( int argc, char** args ){
     ros::init(argc,args,"alum_tag_detector_node");
 
     ros::NodeHandle nh;
+
+    hole_marker_t board = hole_marker_t::create_marker_1();
+
+    auto b = board.make_board();
+
+    cv::Mat img_board;
+    cv::aruco::drawPlanarBoard(b,{800,600},img_board);
+    cv::imshow("test",img_board);
+    cv::waitKey(0);
+
 
     marker_detector_t detector;
 

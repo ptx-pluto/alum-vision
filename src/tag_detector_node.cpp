@@ -224,6 +224,56 @@ struct marker_detector_t {
     }
 
 
+    void image_callback_board( sensor_msgs::ImageConstPtr const & msg ){
+
+        if ( !calibrated ) { return; }
+
+        cv_bridge::CvImageConstPtr cv_ptr;
+        cv_ptr = cv_bridge::toCvShare(msg,sensor_msgs::image_encodings::BGR8);
+
+        //mpSLAM->TrackMonocular(cv_ptr->image,cv_ptr->header.stamp.toSec());
+
+        cv::Mat mat = cv_ptr->image;
+
+        std::vector<int> markerIds;
+        std::vector<std::vector<cv::Point2f>> markerCorners, rejectedCandidates;
+
+        cv::aruco::detectMarkers(mat,dictionary,markerCorners,markerIds,parameters,rejectedCandidates);
+
+        auto marker = hole_marker_t::create_marker_1();
+
+        auto board = marker.make_board();
+
+        std::vector<cv::Vec3d> rvecs, tvecs;
+        cv::aruco::estimatePoseSingleMarkers(markerCorners,marker_length,K,dist_coeff,rvecs,tvecs);
+
+        cv::Vec3d rvec, tvec;
+        cv::aruco::estimatePoseBoard(markerCorners,markerIds,board,K,dist_coeff,rvec,tvec);
+
+        bool detected = !markerIds.empty();
+
+        if ( visualize ) {
+
+            cv::Mat outputImage = mat;
+
+            if ( detected ) {
+
+                outputImage = mat.clone();
+
+                cv::aruco::drawDetectedMarkers(outputImage, markerCorners, markerIds);
+
+                cv::aruco::drawAxis(outputImage, K, dist_coeff, rvec, tvec, marker.tag_size);
+
+            }
+
+            cv::imshow("test",outputImage);
+            cv::waitKey(1);
+
+        }
+
+    }
+
+
 };
 
 
@@ -232,20 +282,20 @@ int main( int argc, char** args ){
     ros::init(argc,args,"alum_tag_detector_node");
 
     ros::NodeHandle nh;
-
-    hole_marker_t board = hole_marker_t::create_marker_1();
-
-    auto b = board.make_board();
-
-    cv::Mat img_board;
-    cv::aruco::drawPlanarBoard(b,{800,600},img_board);
-    cv::imshow("test",img_board);
-    cv::waitKey(0);
-
+//
+//    hole_marker_t board = hole_marker_t::create_marker_1();
+//
+//    auto b = board.make_board();
+//
+//    cv::Mat img_board;
+//    cv::aruco::drawPlanarBoard(b,{800,600},img_board);
+//    cv::imshow("test",img_board);
+//    cv::waitKey(0);
+//
 
     marker_detector_t detector;
 
-    ros::Subscriber sub = nh.subscribe<sensor_msgs::Image>("/camera/color/image_raw",1,&marker_detector_t::image_callback,&detector);
+    ros::Subscriber sub = nh.subscribe<sensor_msgs::Image>("/camera/color/image_raw",1,&marker_detector_t::image_callback_board,&detector);
 
     ros::Subscriber sub_calib = nh.subscribe<sensor_msgs::CameraInfo>("/camera/color/camera_info",1,&marker_detector_t::camera_info_callback,&detector);
 

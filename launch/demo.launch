@@ -1,12 +1,16 @@
 <?xml version="1.0"?>
 <launch>
   
-  <include file="$(find openni2_launch)/launch/openni2.launch"/>
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch"/>
 
   <node name="marker_detector_node" pkg="alum_vision" type="tag_detector_node" />
 
   <node name="joystick_node" pkg="joy" type="joy_node">
     <param name="~autorepeat_rate" type="double" value="20" />
   </node>
-  
+
+  <node name="plot_node" pkg="rqt_plot" type="rqt_plot" args="/perception/gun/err" />
+
+  <node name="serial_node" pkg="ros_serial_control" type="serial_send.py" />
+
 </launch>

@@ -13,8 +13,42 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <geometry_msgs/Point.h>
 #include <cv_bridge/cv_bridge.h>
 #include <tf/transform_broadcaster.h>
+
+geometry_msgs::Point eigen2ros( Eigen::Vector3d const & src ){
+    geometry_msgs::Point rst;
+    rst.x = src(0);
+    rst.y = src(1);
+    rst.z = src(2);
+    return rst;
+}
+
+Eigen::Quaterniond cv2eigen( cv::Vec3d const & rvec ){
+
+    cv::Mat R; cv::Rodrigues(rvec,R);
+
+    Eigen::Matrix3d RR;
+    for ( int i=0; i<3; i++) {
+        for ( int j=0; j<3; j++) {
+            RR(i,j) = R.at<double>(i,j);
+        }
+    }
+
+    return Eigen::Quaterniond(RR);
+
+}
+
+
+Eigen::Vector3d calc_translation( cv::Vec3d const & rvec, cv::Vec3d const & tvec ){
+
+    Eigen::Quaterniond quat = cv2eigen(rvec);
+    Eigen::Vector3d trans( tvec(0), tvec(1), tvec(2) );
+
+    return -1 * quat.inverse().toRotationMatrix() * trans;
+
+}
 
 
 tf::Quaternion rvec2tf( cv::Vec3d const & rvec ){
@@ -119,7 +153,13 @@ struct marker_detector_t {
     marker_detector_t(){
         parameters = cv::aruco::DetectorParameters::create();
         dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
+
+        pub_pos = nh.advertise<geometry_msgs::Point>("/perception/gun/eye",10);
+        pub_err = nh.advertise<geometry_msgs::Point>("/perception/gun/err",10);
+
     }
+
+    ros::NodeHandle nh;
 
     cv::Ptr<cv::aruco::DetectorParameters> parameters;
 
@@ -140,6 +180,12 @@ struct marker_detector_t {
     bool send_tf = true;
 
     float marker_length = 0.15;
+
+    // ros related
+
+    ros::Publisher pub_pos;
+
+    ros::Publisher pub_err;
 
     void camera_info_callback( sensor_msgs::CameraInfoConstPtr const & msg ){
 
@@ -251,6 +297,18 @@ struct marker_detector_t {
         cv::aruco::estimatePoseBoard(markerCorners,markerIds,board,K,dist_coeff,rvec,tvec);
 
         bool detected = !markerIds.empty();
+
+        if ( detected ) {
+            Eigen::Vector3d T = calc_translation(rvec,tvec);
+            pub_pos.publish(eigen2ros(T));
+
+            Eigen::Vector3d tgt(0,89.5,46);
+
+            Eigen::Vector3d err = T-tgt;
+
+            pub_err.publish(eigen2ros(err));
+
+        }
 
         if ( visualize ) {
 

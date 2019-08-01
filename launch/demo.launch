@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<launch>
+  
+  <include file="$(find openni2_launch)/launch/openni2.launch"/>
+
+  <node name="marker_detector_node" pkg="alum_vision" type="tag_detector_node" />
+
+  <node name="joystick_node" pkg="joy" type="joy_node">
+    <param name="~autorepeat_rate" type="double" value="20" />
+  </node>
+  
+</launch>
